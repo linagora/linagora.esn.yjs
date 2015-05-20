@@ -1,0 +1,20 @@
+{
+  "name": "awesome-yjs",
+  "version": "1.0.0",
+  "description": "",
+  "main": "backend/index.js",
+  "dependencies": {
+    "awesome-module": "^1.0.0",
+    "bower": "^1.4.1",
+    "express": "^4.12.4"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "postinstall": "./node_modules/bower/bin/bower install"
+  },
+  "repository": {
+    "type": "git"
+  },
+  "author": "Linagora Folks",
+  "license": "AGPL-3.0"
+}
