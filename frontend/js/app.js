@@ -60,10 +60,10 @@
   };
 
   angular.module('yjs', ['op.live-conference'])
-    .service('yjsService', ['easyRTCService', function(easyRTCService) {
+    .service('yjsService', ['easyRTCService', '$log', function(easyRTCService, $log) {
       var connector = new EasyRTCConnector(easyRTCService);
       var y = new window.Y(connector);
-      console.log('Created yjs instance', y, connector);
+      $log.info('Created yjs instance', y, connector);
       return function() {
         return {
           y: y,
