@@ -1,0 +1,25 @@
+{
+  "name": "awesome-collaborative-editor",
+  "main": "index.js",
+  "version": "0.0.0",
+  "authors": [
+    "Linagora Folks"
+  ],
+  "moduleType": [
+    "node"
+  ],
+  "license": "AGPL-3.0",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "yjs": "a9c2ec6ba06071f690318fecc0350c6e5a2b141f",
+    "y-list": "https://github.com/y-js/y-list.git",
+    "y-richtext": "https://github.com/y-js/y-richtext.git",
+    "y-selections": "https://github.com/y-js/y-selections.git"
+  }
+}
