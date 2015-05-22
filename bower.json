@@ -17,7 +17,7 @@
     "tests"
   ],
   "dependencies": {
-    "yjs": "master",
+    "yjs": "a9c2ec6ba06071f690318fecc0350c6e5a2b141f",
     "y-list": "https://github.com/y-js/y-list.git",
     "y-richtext": "https://github.com/y-js/y-richtext.git",
     "y-selections": "https://github.com/y-js/y-selections.git"
