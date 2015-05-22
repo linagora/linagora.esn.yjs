@@ -18,20 +18,28 @@
       connector.init({
         role: 'slave',
         syncMethod: 'syncAll',
-        user_id: webrtc.myEasyrtcid
+        user_id: webrtc.myEasyrtcid()
       });
       add_missing_peers();
     };
 
-    webrtc.setDataChannelOpenListener(function(peerId) {
-      // Add all the connected peers
-      connected_peers.push(peerId);
-      if (connector.is_bound_to_y) {
-        when_bound_to_y();
+    webrtc.setGotConnection(function(gotConnection) {
+      if (gotConnection) {
+        if (connector.is_bound_to_y) {
+          when_bound_to_y();
+        } else {
+          connector.on_bound_to_y = when_bound_to_y();
+        }
       } else {
-        connector.on_bound_to_y = when_bound_to_y();
+        console.log('Error while getting connection to server.');
       }
-      add_missing_peers();
+    });
+
+    webrtc.setDataChannelOpenListener(function(peerId) {
+      if (connector.is_initialized) {
+        connected_peers.push(peerId);
+        add_missing_peers();
+      }
     });
 
     webrtc.setPeerListener(function(id, msgType, msgData) {
@@ -42,7 +50,6 @@
 
     webrtc.setDataChannelCloseListener(function(peerId) {
       var index = connected_peers.indexOf(peerId);
-      // If index in connected peers, remove it
       if (index > -1) {
         connected_peers.splice(index, 1);
       }
