@@ -4,7 +4,7 @@
   function EasyRTCConnector(webrtc) {
     var connector = this;
     connector.webrtc = webrtc;
-    var connected_peers = [];
+    var connected_peers;
     var add_missing_peers = function() {
       if (connector.is_initialized) {
         var peer = connected_peers.pop();
@@ -20,35 +20,34 @@
         syncMethod: 'syncAll',
         user_id: webrtc.myEasyrtcid()
       });
+      connected_peers = webrtc.getOpenedDataChannels();
       add_missing_peers();
     };
 
-    webrtc.setGotConnection(function(gotConnection) {
-      if (gotConnection) {
-        if (connector.is_bound_to_y) {
-          when_bound_to_y();
-        } else {
-          connector.on_bound_to_y = when_bound_to_y();
-        }
+    webrtc.connection().then(function() {
+      if (connector.is_bound_to_y) {
+        when_bound_to_y();
       } else {
-        console.log('Error while getting connection to server.');
+        connector.on_bound_to_y = when_bound_to_y();
       }
+    }, function(errorCode, message) {
+      console.log('Error while getting connection to server.', errorCode, message);
     });
 
-    webrtc.setDataChannelOpenListener(function(peerId) {
+    webrtc.setDataChannelOpenListeners(function(peerId) {
       if (connector.is_initialized) {
         connected_peers.push(peerId);
         add_missing_peers();
       }
     });
 
-    webrtc.setPeerListener(function(id, msgType, msgData) {
+    webrtc.setPeerListeners(function(id, msgType, msgData) {
       if (connector.is_initialized) {
         connector.receiveMessage(id, JSON.parse(msgData));
       }
     }, 'yjs');
 
-    webrtc.setDataChannelCloseListener(function(peerId) {
+    webrtc.setDataChannelCloseListeners(function(peerId) {
       var index = connected_peers.indexOf(peerId);
       if (index > -1) {
         connected_peers.splice(index, 1);
@@ -60,7 +59,7 @@
   }
 
   EasyRTCConnector.prototype.send = function(user_id, message) {
-    this.webrtc.sendData(user_id, 'yjs', JSON.stringify(message));
+    this.webrtc.sendData(user_id, 'yjs', message);
   };
   EasyRTCConnector.prototype.broadcast = function(message) {
     this.webrtc.broadcastData('yjs', JSON.stringify(message));
