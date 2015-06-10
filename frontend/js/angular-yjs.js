@@ -6,6 +6,23 @@ angular.module('yjs', ['op.live-conference'])
       var connector = this;
       connector.webrtc = webrtc;
       this.connected_peers = [];
+      var messageListeners = [];
+
+
+      this.addMessageListener = function(callback) {
+        messageListeners.push(callback);
+      };
+
+      this.removeMessageListener = function(callback) {
+        messageListeners = messageListeners.filter(function(cb) {
+          return cb !== callback;
+        });
+      };
+
+      this.getMessageListeners = function() {
+        return messageListeners;
+      };
+
       var add_missing_peers = function() {
         if (connector.is_initialized) {
           var peer = connector.connected_peers.pop();
@@ -44,9 +61,17 @@ angular.module('yjs', ['op.live-conference'])
 
       webrtc.addPeerListener(function(id, msgType, msgData) {
         if (connector.is_initialized) {
-          connector.receiveMessage(id, JSON.parse(msgData));
+          var parsedMessage = JSON.parse(msgData);
+          connector.receiveMessage(id, parsedMessage);
+          var messageListeners = connector.getMessageListeners();
+          if (messageListeners) {
+            messageListeners.forEach(function(msgListener) {
+              msgListener.call(msgListener, parsedMessage);
+            });
+          }
         }
       }, 'yjs');
+
 
       webrtc.addDataChannelCloseListener(function(peerId) {
         var index = connector.connected_peers.indexOf(peerId);
@@ -65,6 +90,7 @@ angular.module('yjs', ['op.live-conference'])
     EasyRTCConnector.prototype.broadcast = function(message) {
       this.webrtc.broadcastData('yjs', JSON.stringify(message));
     };
+
     return EasyRTCConnector;
   }])
   .service('yjsService', ['easyRTCService', 'YjsConnectorFactory', '$log', function(easyRTCService, YjsConnectorFactory, $log) {
