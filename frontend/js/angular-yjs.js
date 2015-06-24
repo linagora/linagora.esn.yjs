@@ -1,13 +1,12 @@
 'use strict';
 
 angular.module('yjs', ['op.live-conference'])
-  .factory('YjsConnectorFactory', ['$log', function($log) {
+  .factory('YjsConnectorFactory', ['$log', 'DelayedStack', function($log, DelayedStack) {
     function EasyRTCConnector(webrtc) {
       var connector = this;
       connector.webrtc = webrtc;
       this.connected_peers = [];
       var messageListeners = [];
-
 
       this.addMessageListener = function(callback) {
         messageListeners.push(callback);
@@ -22,16 +21,22 @@ angular.module('yjs', ['op.live-conference'])
       this.getMessageListeners = function() {
         return messageListeners;
       };
+      this.peersStack = {};
 
       var add_missing_peers = function() {
         if (connector.is_initialized) {
-          var peer = connector.connected_peers.pop();
-          while (peer !== undefined) {
+
+          connector.connected_peers.forEach(function(peer) {
+            connector.peersStack[peer] = connector.peersStack[peer] ||
+              new DelayedStack(function(messages) {
+                connector.webrtc.sendData(peer, 'yjs', JSON.stringify(messages));
+              });
+
             connector.userJoined(peer, 'slave');
-            peer = connector.connected_peers.pop();
-          }
+          });
         }
       };
+
       var when_bound_to_y = function() {
         connector.init({
           role: 'slave',
@@ -59,16 +64,20 @@ angular.module('yjs', ['op.live-conference'])
         }
       });
 
-      webrtc.addPeerListener(function(id, msgType, msgData) {
+      webrtc.setPeerListener(function(id, msgType, msgData) {
+        var messages;
+
         if (connector.is_initialized) {
-          var parsedMessage = JSON.parse(msgData);
-          connector.receiveMessage(id, parsedMessage);
-          var messageListeners = connector.getMessageListeners();
-          if (messageListeners) {
+          messages = JSON.parse(msgData);
+          messages.forEach(function(message) {
+
+            connector.receiveMessage(id, message);
+            var messageListeners = connector.getMessageListeners();
+
             messageListeners.forEach(function(msgListener) {
-              msgListener.call(msgListener, parsedMessage);
+              msgListener.call(msgListener, message);
             });
-          }
+          });
         }
       }, 'yjs');
 
@@ -81,17 +90,54 @@ angular.module('yjs', ['op.live-conference'])
         if (connector.is_initialized) {
           connector.userLeft(peerId);
         }
+        delete connector.peersStack[peerId];
+      });
+
+      connector.broadcastStack = new DelayedStack(function(messages) {
+        connector.webrtc.broadcastData('yjs', JSON.stringify(messages));
       });
     }
 
+
     EasyRTCConnector.prototype.send = function(user_id, message) {
-      this.webrtc.sendData(user_id, 'yjs', message);
+      this.peersStack[user_id].push(message);
     };
+
+
     EasyRTCConnector.prototype.broadcast = function(message) {
-      this.webrtc.broadcastData('yjs', JSON.stringify(message));
+      this.broadcastStack.push(message);
     };
 
     return EasyRTCConnector;
+  }])
+  .factory('DelayedStack', ['$window', function($window) {
+    function Delayer(callback) {
+      this.stack = [];
+      this.callback = callback;
+      this.pending = false;
+      this.delayTime = 100;
+      this.maxStackSize = 200;
+    }
+
+    Delayer.prototype.push = function(element) {
+      this.stack.push(element);
+
+      if (!this.pending) {
+        this.pending = true;
+        // Wait some time then call the callback
+        $window.setTimeout(this.flush.bind(this), this.delayTime);
+      } else if (this.stack.length >= this.maxStackSize) {
+        this.flush();
+      }
+    };
+
+    Delayer.prototype.flush = function() {
+      this.callback(this.stack);
+      this.stack = [];
+      this.pending = false;
+    };
+
+    return Delayer;
   }])
   .service('yjsService', ['easyRTCService', 'YjsConnectorFactory', '$log', function(easyRTCService, YjsConnectorFactory, $log) {
     var connector = new YjsConnectorFactory(easyRTCService);
