@@ -116,7 +116,7 @@ angular.module('yjs', ['op.live-conference'])
       this.callback = callback;
       this.pending = false;
       this.delayTime = 100;
-      this.maxStackSize = 200;
+      this.maxStackSize = 1000;
     }
 
     Delayer.prototype.push = function(element) {
