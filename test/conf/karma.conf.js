@@ -10,7 +10,7 @@ module.exports = function(config) {
       'frontend/components/angular-mocks/angular-mocks.js',
       'frontend/components/chai/chai.js',
       'frontend/components/chai-spies/chai-spies.js',
-      'src/**/*.js',
+      'frontend/components/yjs/y.js',
       'test/**/*.js',
       'frontend/js/**/*.js'
     ],
@@ -23,16 +23,6 @@ module.exports = function(config) {
     reporters: ['coverage', 'spec'],
     preprocessors: {
       'frontend/js/**/*.js': ['coverage'],
-      'frontend/views/*.jade': ['ng-jade2module']
-
-    },
-    ngJade2ModulePreprocessor: {
-      stripPrefix: 'frontend/',
-      prependPrefix: 'editor/',
-
-      // setting this option will create only a single module that contains templates
-      // from all the files, so you can load them all with module('templates')
-      moduleName: 'jadeTemplates'
     },
     plugins: [
       'karma-phantomjs-launcher',
@@ -41,7 +31,6 @@ module.exports = function(config) {
       'karma-mocha',
       'karma-coverage',
       'karma-spec-reporter',
-      'karma-ng-jade2module-preprocessor'
     ],
 
     junitReporter: {
