@@ -83,11 +83,13 @@ angular.module('yjs', ['op.live-conference'])
         var index = connector.connected_peers.indexOf(peerId);
         if (index > -1) {
           connector.connected_peers.splice(index, 1);
+          connector.peersStack[peerId].destroy();
+          delete connector.peersStack[peerId];
+          
+          if (connector.is_initialized) {
+            connector.userLeft(peerId);
+          }
         }
-        if (connector.is_initialized) {
-          connector.userLeft(peerId);
-        }
-        delete connector.peersStack[peerId];
       });
 
       connector.broadcastStack = new DelayedStack(function(messages) {
@@ -121,15 +123,19 @@ angular.module('yjs', ['op.live-conference'])
 
       if (!this.pending) {
         this.pending = true;
-        // Wait some time then call the callback
         $window.setTimeout(this.flush.bind(this), this.delayTime);
       } else if (this.stack.length >= this.maxStackSize) {
         this.flush();
       }
     };
 
+    Delayer.prototype.destroy = function() {
+      this.stack = [];
+      this.callback = null;
+    };
+
     Delayer.prototype.flush = function() {
-      this.callback(this.stack);
+      (this.callback || function() {})(this.stack);
       this.stack = [];
       this.pending = false;
     };
