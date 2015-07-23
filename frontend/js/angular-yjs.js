@@ -29,7 +29,7 @@ angular.module('yjs', ['op.live-conference'])
           connector.connected_peers.forEach(function(peer) {
             connector.peersStack[peer] = connector.peersStack[peer] ||
               new DelayedStack(function(messages) {
-                connector.webrtc.sendData(peer, 'yjs', JSON.stringify(messages));
+                connector.webrtc.sendData(peer, 'yjs', messages);
               });
 
             connector.userJoined(peer, 'slave');
@@ -65,11 +65,8 @@ angular.module('yjs', ['op.live-conference'])
       });
 
       webrtc.setPeerListener(function(id, msgType, msgData) {
-        var messages;
-
         if (connector.is_initialized) {
-          messages = JSON.parse(msgData);
-          messages.forEach(function(message) {
+          msgData.forEach(function(message) {
 
             connector.receiveMessage(id, message);
             var messageListeners = connector.getMessageListeners();
@@ -94,7 +91,7 @@ angular.module('yjs', ['op.live-conference'])
       });
 
       connector.broadcastStack = new DelayedStack(function(messages) {
-        connector.webrtc.broadcastData('yjs', JSON.stringify(messages));
+        connector.webrtc.broadcastData('yjs', messages);
       });
     }
 
