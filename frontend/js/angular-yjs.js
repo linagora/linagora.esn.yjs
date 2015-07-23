@@ -6,21 +6,6 @@ angular.module('yjs', ['op.live-conference'])
       var connector = this;
       connector.webrtc = webrtc;
       this.connected_peers = [];
-      var messageListeners = [];
-
-      this.addMessageListener = function(callback) {
-        messageListeners.push(callback);
-      };
-
-      this.removeMessageListener = function(callback) {
-        messageListeners = messageListeners.filter(function(cb) {
-          return cb !== callback;
-        });
-      };
-
-      this.getMessageListeners = function() {
-        return messageListeners;
-      };
       this.peersStack = {};
 
       var add_missing_peers = function() {
@@ -67,13 +52,7 @@ angular.module('yjs', ['op.live-conference'])
       webrtc.setPeerListener(function(id, msgType, msgData) {
         if (connector.is_initialized) {
           msgData.forEach(function(message) {
-
             connector.receiveMessage(id, message);
-            var messageListeners = connector.getMessageListeners();
-
-            messageListeners.forEach(function(msgListener) {
-              msgListener.call(msgListener, message);
-            });
           });
         }
       }, 'yjs');
@@ -85,7 +64,7 @@ angular.module('yjs', ['op.live-conference'])
           connector.connected_peers.splice(index, 1);
           connector.peersStack[peerId].destroy();
           delete connector.peersStack[peerId];
-          
+
           if (connector.is_initialized) {
             connector.userLeft(peerId);
           }
@@ -135,7 +114,8 @@ angular.module('yjs', ['op.live-conference'])
     };
 
     Delayer.prototype.flush = function() {
-      (this.callback || function() {})(this.stack);
+      var callback = this.callback || function() {};
+      callback(this.stack);
       this.stack = [];
       this.pending = false;
     };
