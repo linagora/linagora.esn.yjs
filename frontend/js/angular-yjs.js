@@ -5,7 +5,7 @@ angular.module('yjs', ['op.live-conference'])
     DELAY_BEFORE_SENDING: 100, // ms
     MAX_MESSAGE_GROUP_LENGTH: 0 // if ≤0, do not group
   })
-  .factory('YjsConnectorFactory', ['$log', 'DelayedStack', function($log, DelayedStack) {
+  .factory('YjsConnectorFactory', ['$log', 'DelayedStack', 'compressMessages', function($log, DelayedStack, compressMessages) {
     function EasyRTCConnector(webrtc) {
       var connector = this;
       connector.webrtc = webrtc;
@@ -56,7 +56,7 @@ angular.module('yjs', ['op.live-conference'])
       webrtc.setPeerListener(function(id, msgType, msgData) {
         if (connector.is_initialized) {
           msgData.forEach(function(message) {
-            connector.receiveMessage(id, message);
+            connector.receiveMessage(id, compressMessages.decode(message));
           });
         }
       }, 'yjs');
@@ -80,17 +80,26 @@ angular.module('yjs', ['op.live-conference'])
       });
     }
 
-
     EasyRTCConnector.prototype.send = function(user_id, message) {
-      this.peersStack[user_id].push(message);
+      this.peersStack[user_id].push(compressMessages.encode(message));
     };
 
 
     EasyRTCConnector.prototype.broadcast = function(message) {
-      this.broadcastStack.push(message);
+      this.broadcastStack.push(compressMessages.encode(message));
     };
 
     return EasyRTCConnector;
+  }])
+  .factory('compressMessages', [function() {
+    return {
+      encode: function(message) {
+        return message;
+      },
+      decode: function(message) {
+        return message;
+      }
+    };
   }])
   .factory('DelayedStack', ['$timeout', 'YJS_CONSTANTS', function($timeout, YJS_CONSTANTS) {
     function Delayer(callback) {
