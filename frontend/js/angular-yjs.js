@@ -92,7 +92,7 @@ angular.module('yjs', ['op.live-conference'])
 
     return EasyRTCConnector;
   }])
-  .factory('DelayedStack', ['$window', 'YJS_CONSTANTS', function($window, YJS_CONSTANTS) {
+  .factory('DelayedStack', ['$timeout', 'YJS_CONSTANTS', function($timeout, YJS_CONSTANTS) {
     function Delayer(callback) {
       this.stack = [];
       this.callback = callback;
@@ -106,7 +106,7 @@ angular.module('yjs', ['op.live-conference'])
 
       if (!this.pending) {
         this.pending = true;
-        $window.setTimeout(this.flush.bind(this), this.delayTime);
+        $timeout(this.flush.bind(this), this.delayTime);
       } else if (this.maxStackSize > 0 && this.stack.length >= this.maxStackSize) {
         this.flush();
       }
@@ -118,8 +118,10 @@ angular.module('yjs', ['op.live-conference'])
     };
 
     Delayer.prototype.flush = function() {
-      var callback = this.callback || function() {};
-      callback(this.stack);
+      if (this.callback) {
+        this.callback(this.stack);
+      }
+
       this.stack = [];
       this.pending = false;
     };

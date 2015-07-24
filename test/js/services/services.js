@@ -4,7 +4,7 @@
 var expect = chai.expect;
 
 describe('delayedStack', function() {
-  var YjsConnectorFactory, DelayedStack, yjsService, connectionCallback, $window, YJS_CONSTANTS;
+  var YjsConnectorFactory, DelayedStack, yjsService, connectionCallback, $timeout, YJS_CONSTANTS;
   var dataChannelOpenListener, dataChannelCloseListener, peerListener;
   var easyRtcServiceMock;
   beforeEach(angular.mock.module('yjs'));
@@ -43,11 +43,11 @@ describe('delayedStack', function() {
     $provide.value('easyRTCService', easyRtcServiceMock);
   }));
 
-  beforeEach(angular.mock.inject(function(_YjsConnectorFactory_, _DelayedStack_, _yjsService_, _$window_, _YJS_CONSTANTS_) {
+  beforeEach(angular.mock.inject(function(_YjsConnectorFactory_, _DelayedStack_, _yjsService_, _$timeout_, _YJS_CONSTANTS_) {
     YjsConnectorFactory = _YjsConnectorFactory_;
     DelayedStack = _DelayedStack_;
     yjsService = _yjsService_;
-    $window = _$window_;
+    $timeout = _$timeout_;
     YJS_CONSTANTS = _YJS_CONSTANTS_;
   }));
 
@@ -148,6 +148,8 @@ describe('delayedStack', function() {
         };
         connector.send('foo', 'Hey, what\'s up?');
         connector.send('foo', 'Still me.');
+
+        $timeout.flush();
       });
 
       it('shoud be able to broadcast a message to all connected peers', function(done) {
@@ -165,6 +167,8 @@ describe('delayedStack', function() {
         };
         connector.broadcast('Hey, what\'s up?');
         connector.broadcast('Still me.');
+
+        $timeout.flush();
       });
 
       it('should create a DelayedStack object for each peer and remove it when the peer disconnects', function() {
@@ -237,6 +241,8 @@ describe('delayedStack', function() {
         myElems.forEach(function(element) {
           delayedStack.push(element);
         });
+
+        $timeout.flush();
       });
 
       it('should call flush synchronously if too many messages are pending', function() {
@@ -252,17 +258,32 @@ describe('delayedStack', function() {
         expect(delayedStack.flush).to.have.been.called.once();
       });
 
-      it('should not call flush twice (too quickly)', function(done) {
+      it('should call flush asynchronously if the max number of messages is ≤ 0', function() {
+        YJS_CONSTANTS.MAX_MESSAGE_GROUP_LENGTH = 0;
+        delayedStack = new DelayedStack();
+        delayedStack.flush = chai.spy();
+        for (var i = 0; i < delayedStack.maxStackSize - 1; i++) {
+          delayedStack.push(i);
+        }
+
+        expect(delayedStack.flush).to.not.have.been.called();
+        delayedStack.push('the straw that didn\'t broke the camel');
+        expect(delayedStack.flush).to.not.have.been.called();
+
+        $timeout.flush();
+        expect(delayedStack.flush).to.have.been.called.once();
+      });
+
+      it('should not call flush twice (too quickly)', function() {
         delayedStack.flush = chai.spy();
 
         myElems.forEach(function(element) {
           delayedStack.push(element);
         });
 
-        $window.setTimeout(function() {
-          expect(delayedStack.flush).to.have.been.called.once;
-          done();
-        }, delayedStack.delayTime * 2);
+        $timeout.flush();
+
+        expect(delayedStack.flush).to.have.been.called.once;
       });
 
     });
