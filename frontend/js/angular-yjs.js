@@ -18,7 +18,11 @@ angular.module('yjs', ['op.live-conference'])
           connector.connected_peers.forEach(function(peer) {
             connector.peersStack[peer] = connector.peersStack[peer] ||
               new DelayedStack(function(messages) {
-                connector.webrtc.sendData(peer, 'yjs', messages);
+                var map = messages[messages.length - 1].map;
+                var data = messages.map(function(message) {
+                  return message.data;
+                });
+                connector.webrtc.sendData(peer, 'yjs', {map: map, data: data});
               });
 
             connector.userJoined(peer, 'slave');
@@ -53,10 +57,19 @@ angular.module('yjs', ['op.live-conference'])
         }
       });
 
+      /** Expect a message in the form
+        * {
+        *   data: [],
+        *   map: {},
+        * }
+        */
       webrtc.setPeerListener(function(id, msgType, msgData) {
+        var data, map;
         if (connector.is_initialized) {
-          msgData.forEach(function(message) {
-            connector.receiveMessage(id, compressMessages.decode(message));
+          data = msgData.data;
+          map = msgData.map;
+          data.forEach(function(message) {
+            connector.receiveMessage(id, compressMessages.decode({data: message, map: map}));
           });
         }
       }, 'yjs');
@@ -76,7 +89,12 @@ angular.module('yjs', ['op.live-conference'])
       });
 
       connector.broadcastStack = new DelayedStack(function(messages) {
-        connector.webrtc.broadcastData('yjs', messages);
+        var map = messages[messages.length - 1].map;
+        var data = messages.map(function(message) {
+          return message.data;
+        });
+
+        connector.webrtc.broadcastData('yjs', {map: map, data: data});
       });
     }
 
@@ -91,13 +109,134 @@ angular.module('yjs', ['op.live-conference'])
 
     return EasyRTCConnector;
   }])
-  .factory('compressMessages', [function() {
+  .constant('COMPRESS_MAP', {
+    'sync_step': 'A',
+    'send_again': 'B',
+    'data': 'C',
+    'type': 'D',
+    'uid': 'E',
+    'creator': 'F',
+    'op_number': 'G',
+    'custom_type': 'H',
+    'content': 'I',
+    'prev': 'J',
+    'next': 'K',
+    'origin': 'L',
+    'parent': 'M',
+    'sub': 'N',
+    'user': 'O',
+    'state': 'P',
+    'composition_value': 'Q',
+    'composition_value_operations': 'R',
+    'composition_ref': 'S',
+    'content_operations': 'T',
+    'selections': 'U',
+    'characters': 'V',
+    'cursors': 'W',
+    'attrs': 'X',
+    'overwrite': 'Y',
+    'from': 'Z',
+    'to': 'a',
+    'sent_again': 'b',
+    'deletes': 'c'
+  })
+  .factory('compressMessages', ['COMPRESS_MAP', function(COMPRESS_MAP) {
+    var magic_prefix = '_';
+
+    var keySet = new Set();
+    var DECOMPRESS_MAP = {};
+    for (var key in COMPRESS_MAP) {
+      DECOMPRESS_MAP[COMPRESS_MAP[key]] = key;
+    }
+
+    // Contain information about already seen values
+    var extraCompress = {
+      seen: new Set(),
+      list: [],
+      lastIndex: 0
+    };
+
+    function coder(data, map, extraMap) {
+      var val;
+      if (data instanceof Array) {
+        return data.map(function(element) {
+          return coder(element, map, extraMap);
+        });
+
+      } else if (data instanceof Object) {
+        var encoded = {};
+
+        for (var key in data) {
+          val = coder(data[key], map, extraMap);
+
+          if (map[key]) {
+            encoded[map[key]] = val;
+          } else {
+            if (map === COMPRESS_MAP) {
+              keySet.add(key);
+            }
+            encoded[key] = val;
+          }
+        }
+        return encoded;
+
+      } else {
+        // Store the strings seen in an object for later compression
+        if (typeof data === 'string') {
+
+          // When compressing, add to the seen string and if already in, create an alias for it
+          if (map === COMPRESS_MAP) {
+            var returnAlias = false;
+
+            if (extraCompress.seen.has(data)) {
+              returnAlias = true;
+            } else {
+              extraCompress.seen.add(data);
+            }
+
+            // special case if the string starts with '\u0000', then we force to compress it
+            if (data[0] === magic_prefix) {
+              returnAlias = true;
+            }
+
+            if (returnAlias) {
+              var index = extraCompress.list.indexOf(data);
+              if (extraCompress.list.indexOf(data) === -1) {
+                index = extraCompress.list.length;
+                extraCompress.list.push(data);
+              }
+
+              return magic_prefix + index;
+            }
+
+          } else {
+            // When the first char is the magic char, it should be in extraMap
+            if (data[0] === magic_prefix) {
+              return extraMap[data];
+            }
+          }
+        }
+        return data;
+      }
+    }
+
     return {
-      encode: function(message) {
-        return message;
+      encode: function(data) {
+        var encoded = coder(data, COMPRESS_MAP);
+        var map = {};
+        extraCompress.list.forEach(function(element, index) {
+          map[magic_prefix + index] = element;
+        });
+
+        return {
+          data: encoded,
+          map: map
+        };
       },
-      decode: function(message) {
-        return message;
+      decode: function(obj) {
+        var data = obj.data;
+        var map = obj.map;
+        return coder(data, DECOMPRESS_MAP, map);
       }
     };
   }])
