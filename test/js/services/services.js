@@ -4,7 +4,7 @@
 var expect = chai.expect;
 
 describe('delayedStack', function() {
-  var YjsConnectorFactory, DelayedStack, yjsService, connectionCallback, $window;
+  var YjsConnectorFactory, DelayedStack, yjsService, connectionCallback, $window, YJS_CONSTANTS;
   var dataChannelOpenListener, dataChannelCloseListener, peerListener;
   var easyRtcServiceMock;
   beforeEach(angular.mock.module('yjs'));
@@ -43,11 +43,12 @@ describe('delayedStack', function() {
     $provide.value('easyRTCService', easyRtcServiceMock);
   }));
 
-  beforeEach(angular.mock.inject(function(_YjsConnectorFactory_, _DelayedStack_, _yjsService_, _$window_) {
+  beforeEach(angular.mock.inject(function(_YjsConnectorFactory_, _DelayedStack_, _yjsService_, _$window_, _YJS_CONSTANTS_) {
     YjsConnectorFactory = _YjsConnectorFactory_;
     DelayedStack = _DelayedStack_;
     yjsService = _yjsService_;
     $window = _$window_;
+    YJS_CONSTANTS = _YJS_CONSTANTS_;
   }));
 
   describe('yjsService', function() {
@@ -239,6 +240,8 @@ describe('delayedStack', function() {
       });
 
       it('should call flush synchronously if too many messages are pending', function() {
+        YJS_CONSTANTS.MAX_MESSAGE_GROUP_LENGTH = 100;
+        delayedStack = new DelayedStack();
         delayedStack.flush = chai.spy();
         for (var i = 0; i < delayedStack.maxStackSize - 1; i++) {
           delayedStack.push(i);
