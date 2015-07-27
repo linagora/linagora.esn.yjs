@@ -282,6 +282,14 @@ describe('delayedStack', function() {
 
         expect(ret.data).to.deep.equal([1]);
       });
+
+      it('should force the encoding of _-starting strings', function() {
+        var string = '_foo';
+
+        var ret = compressMessages.encode(string);
+        expect(ret.map._0).to.exist
+          .and.to.equal('_foo');
+      });
     });
 
     describe('the decode method', function() {

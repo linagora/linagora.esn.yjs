@@ -57,7 +57,7 @@ angular.module('yjs', ['op.live-conference'])
         }
       });
 
-      /** Expect a message in the form
+      /** Expect msgData in the form
         * {
         *   data: [],
         *   map: {},
