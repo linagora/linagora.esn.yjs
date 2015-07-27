@@ -1,37 +1,31 @@
 'use strict';
 
 angular.module('yjs', ['op.live-conference'])
-  .factory('YjsConnectorFactory', ['$log', function($log) {
+  .constant('YJS_CONSTANTS', {
+    DELAY_BEFORE_SENDING: 100, // ms
+    MAX_MESSAGE_GROUP_LENGTH: 0 // if ≤0, do not group
+  })
+  .factory('YjsConnectorFactory', ['$log', 'DelayedStack', function($log, DelayedStack) {
     function EasyRTCConnector(webrtc) {
       var connector = this;
       connector.webrtc = webrtc;
       this.connected_peers = [];
-      var messageListeners = [];
-
-
-      this.addMessageListener = function(callback) {
-        messageListeners.push(callback);
-      };
-
-      this.removeMessageListener = function(callback) {
-        messageListeners = messageListeners.filter(function(cb) {
-          return cb !== callback;
-        });
-      };
-
-      this.getMessageListeners = function() {
-        return messageListeners;
-      };
+      this.peersStack = {};
 
       var add_missing_peers = function() {
         if (connector.is_initialized) {
-          var peer = connector.connected_peers.pop();
-          while (peer !== undefined) {
+
+          connector.connected_peers.forEach(function(peer) {
+            connector.peersStack[peer] = connector.peersStack[peer] ||
+              new DelayedStack(function(messages) {
+                connector.webrtc.sendData(peer, 'yjs', messages);
+              });
+
             connector.userJoined(peer, 'slave');
-            peer = connector.connected_peers.pop();
-          }
+          });
         }
       };
+
       var when_bound_to_y = function() {
         connector.init({
           role: 'slave',
@@ -59,16 +53,11 @@ angular.module('yjs', ['op.live-conference'])
         }
       });
 
-      webrtc.addPeerListener(function(id, msgType, msgData) {
+      webrtc.setPeerListener(function(id, msgType, msgData) {
         if (connector.is_initialized) {
-          var parsedMessage = JSON.parse(msgData);
-          connector.receiveMessage(id, parsedMessage);
-          var messageListeners = connector.getMessageListeners();
-          if (messageListeners) {
-            messageListeners.forEach(function(msgListener) {
-              msgListener.call(msgListener, parsedMessage);
-            });
-          }
+          msgData.forEach(function(message) {
+            connector.receiveMessage(id, message);
+          });
         }
       }, 'yjs');
 
@@ -77,21 +66,67 @@ angular.module('yjs', ['op.live-conference'])
         var index = connector.connected_peers.indexOf(peerId);
         if (index > -1) {
           connector.connected_peers.splice(index, 1);
+          connector.peersStack[peerId].destroy();
+          delete connector.peersStack[peerId];
+
+          if (connector.is_initialized) {
+            connector.userLeft(peerId);
+          }
         }
-        if (connector.is_initialized) {
-          connector.userLeft(peerId);
-        }
+      });
+
+      connector.broadcastStack = new DelayedStack(function(messages) {
+        connector.webrtc.broadcastData('yjs', messages);
       });
     }
 
+
     EasyRTCConnector.prototype.send = function(user_id, message) {
-      this.webrtc.sendData(user_id, 'yjs', message);
+      this.peersStack[user_id].push(message);
     };
+
+
     EasyRTCConnector.prototype.broadcast = function(message) {
-      this.webrtc.broadcastData('yjs', JSON.stringify(message));
+      this.broadcastStack.push(message);
     };
 
     return EasyRTCConnector;
+  }])
+  .factory('DelayedStack', ['$timeout', 'YJS_CONSTANTS', function($timeout, YJS_CONSTANTS) {
+    function Delayer(callback) {
+      this.stack = [];
+      this.callback = callback;
+      this.pending = false;
+      this.delayTime = YJS_CONSTANTS.DELAY_BEFORE_SENDING;
+      this.maxStackSize = YJS_CONSTANTS.MAX_MESSAGE_GROUP_LENGTH;
+    }
+
+    Delayer.prototype.push = function(element) {
+      this.stack.push(element);
+
+      if (!this.pending) {
+        this.pending = true;
+        $timeout(this.flush.bind(this), this.delayTime);
+      } else if (this.maxStackSize > 0 && this.stack.length >= this.maxStackSize) {
+        this.flush();
+      }
+    };
+
+    Delayer.prototype.destroy = function() {
+      this.stack = [];
+      this.callback = null;
+    };
+
+    Delayer.prototype.flush = function() {
+      if (this.callback) {
+        this.callback(this.stack);
+      }
+
+      this.stack = [];
+      this.pending = false;
+    };
+
+    return Delayer;
   }])
   .service('yjsService', ['easyRTCService', 'YjsConnectorFactory', '$log', function(easyRTCService, YjsConnectorFactory, $log) {
     var connector = new YjsConnectorFactory(easyRTCService);

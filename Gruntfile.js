@@ -167,6 +167,6 @@ module.exports = function(grunt) {
    */
   grunt.registerTask('linters-dev', 'Check changed files for lint', ['prepare-quick-lint', 'jshint:quick', 'gjslint:quick', 'lint_pattern:quick']);
 
-  grunt.registerTask('default', ['templates', 'linters', 'concat:dist']);
+  grunt.registerTask('default', ['templates', 'test', 'concat:dist']);
   grunt.registerTask('compile', ['templates', 'concat:dist']);
 };

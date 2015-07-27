@@ -17,9 +17,10 @@ var AwesomeYjsModule = new AwesomeModule('linagora.esn.yjs', {
       var app = require('./webserver/application')(dependencies);
       var webserver = dependencies('webserver-wrapper');
 
-      var depList = ['yjs/build/browser/y.js', 'y-list/y-list.js', 'y-selections/y-selections.js', 'y-richtext/y-richtext.js'].map(function(e) {
-        return '../components/' + e;
-      });
+      var depList = ['yjs/build/browser/y.js', 'y-list/build/browser/y-list.js', 'y-selections/y-selections.js',
+        'y-richtext/build/browser/y-richtext.js', 'js_bintrees/dist/rbtree_by_index.js'].map(function(e) {
+          return '../components/' + e;
+        });
 
       webserver.injectAngularModules('yjs', ['angular-yjs.js'], 'yjs', ['live-conference']);
       webserver.injectJS('yjs', depList, ['live-conference']);
