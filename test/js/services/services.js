@@ -4,7 +4,7 @@
 var expect = chai.expect;
 
 describe('delayedStack', function() {
-  var YjsConnectorFactory, DelayedStack, yjsService, connectionCallback, $timeout, YJS_CONSTANTS;
+  var YjsConnectorFactory, DelayedStack, compressMessages, yjsService, connectionCallback, $timeout, YJS_CONSTANTS, COMPRESS_MAP;
   var dataChannelOpenListener, dataChannelCloseListener, peerListener;
   var easyRtcServiceMock;
   beforeEach(angular.mock.module('yjs'));
@@ -43,12 +43,14 @@ describe('delayedStack', function() {
     $provide.value('easyRTCService', easyRtcServiceMock);
   }));
 
-  beforeEach(angular.mock.inject(function(_YjsConnectorFactory_, _DelayedStack_, _yjsService_, _$timeout_, _YJS_CONSTANTS_) {
+  beforeEach(angular.mock.inject(function(_YjsConnectorFactory_, _DelayedStack_, _compressMessages_, _yjsService_, _$timeout_, _YJS_CONSTANTS_, _COMPRESS_MAP_) {
     YjsConnectorFactory = _YjsConnectorFactory_;
     DelayedStack = _DelayedStack_;
+    compressMessages = _compressMessages_;
     yjsService = _yjsService_;
     $timeout = _$timeout_;
     YJS_CONSTANTS = _YJS_CONSTANTS_;
+    COMPRESS_MAP = _COMPRESS_MAP_;
   }));
 
   describe('yjsService', function() {
@@ -66,6 +68,15 @@ describe('delayedStack', function() {
 
     beforeEach(function() {
       connector = yjsService().connector;
+      compressMessages.encode = function(message) {
+        return {
+          data: message,
+          map: {}
+        };
+      };
+      compressMessages.decode = function(message) {
+        return message.data;
+      };
     });
 
     it('should delay the initialization until bound to Y', function() {
@@ -126,11 +137,11 @@ describe('delayedStack', function() {
         var id = 'qsfdqsdf', msgType = 'we don\t care', msgData = ['message 0', 'message 1'];
         connector.receiveMessage = chai.spy();
 
-        peerListener(id, msgType, msgData);
+        peerListener(id, msgType, {data: msgData, map: {}});
 
         expect(connector.receiveMessage).to.have.been.called.twice
-          .with(id, msgData[0])
-          .with(id, msgData[1]);
+          .with(id)
+          .with(id);
       });
 
       it('shoud be able to send a message to a connected peer', function(done) {
@@ -138,11 +149,15 @@ describe('delayedStack', function() {
         // we flush, because yjs sends extra information
         connector.peersStack.foo.flush();
 
-        easyRtcServiceMock.sendData = function(id, name, messages) {
+        easyRtcServiceMock.sendData = function(id, name, data) {
           expect(id).to.equal('foo');
           expect(name).to.equal('yjs');
-          expect(messages[0]).to.equal('Hey, what\'s up?');
-          expect(messages[1]).to.equal('Still me.');
+          expect(data).to.have.property('data')
+            .and.be.an('array');
+          expect(data).to.have.property('map')
+            .and.be.an('object');
+          expect(data.data[0]).to.equal('Hey, what\'s up?');
+          expect(data.data[1]).to.equal('Still me.');
 
           done();
         };
@@ -152,16 +167,20 @@ describe('delayedStack', function() {
         $timeout.flush();
       });
 
-      it('shoud be able to broadcast a message to all connected peers', function(done) {
+      it('should be able to broadcast a message to all connected peers', function(done) {
         dataChannelOpenListener('foo');
         dataChannelOpenListener('bar');
         // we flush, because yjs sends extra information
         connector.broadcastStack.flush();
 
-        easyRtcServiceMock.broadcastData = function(name, messages) {
+        easyRtcServiceMock.broadcastData = function(name, data) {
           expect(name).to.equal('yjs');
-          expect(messages[0]).to.equal('Hey, what\'s up?');
-          expect(messages[1]).to.equal('Still me.');
+          expect(data).to.have.property('data')
+            .and.be.an('array');
+          expect(data).to.have.property('map')
+            .and.be.an('object');
+          expect(data.data[0]).to.equal('Hey, what\'s up?');
+          expect(data.data[1]).to.equal('Still me.');
 
           done();
         };
@@ -194,6 +213,86 @@ describe('delayedStack', function() {
           });
       });
 
+    });
+
+  });
+  describe('compressMessages service', function() {
+    it('should have an encode and a decode method', function() {
+      expect(compressMessages.encode).to.be.a('function');
+      expect(compressMessages.decode).to.be.a('function');
+    });
+
+    describe('the encode method', function() {
+      it('should return an object', function() {
+        var ret = compressMessages.encode('foo');
+
+        /* The return value has the data compressed and a map that gives the alias */
+        expect(ret).to.have.property('data');
+        expect(ret).to.have.property('map');
+      });
+
+      it('should compress frequent strings', function() {
+        var ret0 = compressMessages.encode({foo: 'bar'});
+        expect(ret0.map).to.deep.equal({});
+
+        var ret1 = compressMessages.encode({notfoo: 'bar'});
+        expect(ret1.map).to.deep.equal({_0: 'bar'});
+        expect(ret1.data).to.deep.equal({notfoo: '_0'});
+      });
+
+      it('should compress objects\' keys that are in the COMPRESS_MAP', function() {
+        for (var knownKey in COMPRESS_MAP) {
+          var compressMe = {};
+          compressMe[knownKey] = knownKey;
+          var ret = compressMessages.encode(compressMe);
+
+          var expected = {};
+          expected[COMPRESS_MAP[knownKey]] = knownKey;
+          expect(ret.data).to.deep.equal(expected);
+        }
+      });
+
+      it('should compress recursively', function() {
+        COMPRESS_MAP = {
+          'foo': '1',
+          'bar': '2'
+        };
+
+        // sync_step maps to 'A' and send_again to 'B'
+        var obj0 = {'sync_step' : '0'};
+        var obj1 = {'send_again': obj0};
+        var ret = compressMessages.encode(obj1);
+
+        expect(ret.data).to.deep.equal({'B' : { 'A': '0'}});
+      });
+
+      it('should compress arrays', function() {
+        var obj = [{'sync_step': 0}, {'sync_step' : 1}];
+
+        var ret = compressMessages.encode(obj);
+
+        expect(ret.data).to.be.an('array')
+        .and.to.deep.equal([{'A': 0}, {'A': 1}]);
+      });
+
+      it('should not compress other objects', function() {
+        var obj = [1];
+
+        var ret = compressMessages.encode(obj);
+
+        expect(ret.data).to.deep.equal([1]);
+      });
+    });
+
+    describe('the decode method', function() {
+      it('should be able to decode the input of encode', function() {
+        var object = {
+          'foo': 'bar',
+          'otherfoo': 'bar',
+          'arrayTest': [1, 2, 'foo', 'bar']};
+        var ret = compressMessages.encode(object);
+        expect(compressMessages.decode(ret)).to.deep.equal(object);
+      });
     });
 
   });
