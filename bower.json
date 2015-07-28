@@ -17,11 +17,11 @@
     "tests"
   ],
   "dependencies": {
-    "yjs": "cphyc/yjs#v0.5.3",
-    "y-list": "https://github.com/y-js/y-list.git",
-    "y-richtext": "https://github.com/y-js/y-richtext.git",
-    "y-selections": "https://github.com/y-js/y-selections.git",
-    "js_bintrees": "cphyc/js_bintrees#rbtree-by-index"
+    "yjs": "cphyc/yjs#^0.5.3",
+    "y-list": "https://github.com/y-js/y-list.git#^0.5.1",
+    "y-richtext": "https://github.com/y-js/y-richtext.git#^0.5.3",
+    "y-selections": "https://github.com/y-js/y-selections.git#^0.5.2",
+    "js_bintrees": "https://ci.open-paas.org/stash/scm/olibs/js_bintrees.git"
   },
   "devDependencies": {
     "chai": "2.3.0",
