@@ -19,7 +19,7 @@
   "dependencies": {
     "yjs": "cphyc/yjs#^0.5.3",
     "y-list": "https://github.com/y-js/y-list.git#^0.5.1",
-    "y-richtext": "https://github.com/y-js/y-richtext.git#^0.5.3",
+    "y-richtext": "https://github.com/y-js/y-richtext.git#^0.5.4",
     "y-selections": "https://github.com/y-js/y-selections.git#^0.5.2",
     "js_bintrees": "https://ci.open-paas.org/stash/scm/olibs/js_bintrees.git"
   },
