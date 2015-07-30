@@ -6,12 +6,20 @@ angular.module('yjs', ['op.live-conference'])
     MAX_MESSAGE_GROUP_LENGTH: 0 // if ≤0, do not group
   })
   .factory('YjsConnectorFactory', ['$log', 'DelayedStack', 'compressMessages', function($log, DelayedStack, compressMessages) {
-    function EasyRTCConnector(webrtc) {
+    /**
+      * A connector for EasyRTC
+      * @param {object} easyrtc an easyrtc object
+      **/
+    function EasyRTCConnector(easyrtc) {
       var connector = this;
-      connector.webrtc = webrtc;
+      connector.webrtc = easyrtc;
       this.connected_peers = [];
       this.peersStack = {};
 
+      /** When the connection is up, we want to be notified of all the connected peers.
+        * Moreover, each pear should have a DelayedStack to delay messages before being
+        * sent.
+        **/
       var add_missing_peers = function() {
         if (connector.is_initialized) {
 
@@ -30,17 +38,20 @@ angular.module('yjs', ['op.live-conference'])
         }
       };
 
+      /** This function will be called when the connector will be bound to yjs,
+        * a.k.a when Y(connector) will have been called.
+        **/
       var when_bound_to_y = function() {
         connector.init({
           role: 'slave',
           syncMethod: 'syncAll',
-          user_id: webrtc.myEasyrtcid()
+          user_id: easyrtc.myEasyrtcid()
         });
-        connector.connected_peers = webrtc.getOpenedDataChannels();
+        connector.connected_peers = easyrtc.getOpenedDataChannels();
         add_missing_peers();
       };
 
-      webrtc.connection().then(function() {
+      easyrtc.connection().then(function() {
         if (connector.is_bound_to_y) {
           when_bound_to_y();
         } else {
@@ -50,20 +61,21 @@ angular.module('yjs', ['op.live-conference'])
         $log.error('Error while getting connection to server.', errorCode, message);
       });
 
-      webrtc.addDataChannelOpenListener(function(peerId) {
+      easyrtc.addDataChannelOpenListener(function(peerId) {
         if (connector.is_initialized) {
           connector.connected_peers.push(peerId);
           add_missing_peers();
         }
       });
 
-      /** Expect msgData in the form
+      /** Expect msgData to be a compressed message with data and a map that
+        * gives compression information. See @compressMessages methods
         * {
         *   data: [],
         *   map: {},
         * }
         */
-      webrtc.setPeerListener(function(id, msgType, msgData) {
+      easyrtc.setPeerListener(function(id, msgType, msgData) {
         var data, map;
         if (connector.is_initialized) {
           data = msgData.data;
@@ -75,7 +87,8 @@ angular.module('yjs', ['op.live-conference'])
       }, 'yjs');
 
 
-      webrtc.addDataChannelCloseListener(function(peerId) {
+      /** Notify of user deconnection and delete the peer stack of the user **/
+      easyrtc.addDataChannelCloseListener(function(peerId) {
         var index = connector.connected_peers.indexOf(peerId);
         if (index > -1) {
           connector.connected_peers.splice(index, 1);
@@ -88,6 +101,10 @@ angular.module('yjs', ['op.live-conference'])
         }
       });
 
+      /** Initialize a DelayedStack for braodcasting.
+        * Since the encoding function appends new element to the map, only send
+        * the last map along with the messages
+        **/
       connector.broadcastStack = new DelayedStack(function(messages) {
         var map = messages[messages.length - 1].map;
         var data = messages.map(function(message) {
@@ -98,11 +115,17 @@ angular.module('yjs', ['op.live-conference'])
       });
     }
 
+    /** Sends a message to an user
+      * @param {String} user_id the id of the receiver
+      * @param {*} message a stringifiable object
+      **/
     EasyRTCConnector.prototype.send = function(user_id, message) {
       this.peersStack[user_id].push(compressMessages.encode(message));
     };
 
-
+    /** Broadcasts a message to all user
+      * @param {*} message a stringifiable object
+      **/
     EasyRTCConnector.prototype.broadcast = function(message) {
       this.broadcastStack.push(compressMessages.encode(message));
     };
@@ -156,6 +179,13 @@ angular.module('yjs', ['op.live-conference'])
       lastIndex: 0
     };
 
+    /** Generic function that converts any javascript object using the map and extraMap.
+      * @parma {*} data any javascript type
+      * @param {Object} map an associative map between keys
+      * @param {=Object} extraMap an extra optional associative map between keys
+          it is used to encode frequently used strings
+      ** @return {*} returns an encoded/decoded variable of the same type as
+      **/
     function coder(data, map, extraMap) {
       var val;
       if (data instanceof Array) {
@@ -183,9 +213,14 @@ angular.module('yjs', ['op.live-conference'])
       } else {
         // Store the strings seen in an object for later compression
         if (typeof data === 'string') {
-
-          // When compressing, add to the seen string and if already in, create an alias for it
           if (map === COMPRESS_MAP) {
+            /* when compressing, the data can either:
+             * - be a new string, we add it to the 'seen' Set
+             * - be a once-seen string, we create a shortname for it and return it
+             * - be a more-than-one-seen string, we return its shortname
+             * - start with the 'magic_prefix', we then force it to be replace by its shortcut
+                 so that any string starting with the magic_prefix is encoded
+             */
             var returnAlias = false;
 
             if (extraCompress.seen.has(data)) {
@@ -194,7 +229,6 @@ angular.module('yjs', ['op.live-conference'])
               extraCompress.seen.add(data);
             }
 
-            // special case if the string starts with '\u0000', then we force to compress it
             if (data[0] === magic_prefix) {
               returnAlias = true;
             }
@@ -209,11 +243,8 @@ angular.module('yjs', ['op.live-conference'])
               return magic_prefix + index;
             }
 
-          } else {
-            // When the first char is the magic char, it should be in extraMap
-            if (data[0] === magic_prefix) {
-              return extraMap[data];
-            }
+          } else if (data[0] === magic_prefix) {
+            return extraMap[data];
           }
         }
         return data;
@@ -221,6 +252,10 @@ angular.module('yjs', ['op.live-conference'])
     }
 
     return {
+      /** Encode the data and return it with an map of the shortcuts used
+        * @param {*} data any javascript variable
+        * @return {Object} an object containing the map in 'map' and the encoded data in 'data'
+        **/
       encode: function(data) {
         var encoded = coder(data, COMPRESS_MAP);
         var map = {};
@@ -233,6 +268,10 @@ angular.module('yjs', ['op.live-conference'])
           map: map
         };
       },
+      /** Decode an object
+        * @param {Object} obj and object that has a 'map' and a 'data' properties
+        * @return {*} the decoded message
+        **/
       decode: function(obj) {
         var data = obj.data;
         var map = obj.map;
@@ -240,7 +279,15 @@ angular.module('yjs', ['op.live-conference'])
       }
     };
   }])
+  /** Return the DelayedStack constructor
+    * @return {DelayedStack} the DelayedStack constructor
+    **/
   .factory('DelayedStack', ['$timeout', 'YJS_CONSTANTS', function($timeout, YJS_CONSTANTS) {
+    /**
+      * Create an instance of DelayedStack. It calls the given callback with the pushed elements at frequent intervals.
+      * @constructor
+      * @param {function} callback the callback
+      **/
     function Delayer(callback) {
       this.stack = [];
       this.callback = callback;
@@ -249,6 +296,10 @@ angular.module('yjs', ['op.live-conference'])
       this.maxStackSize = YJS_CONSTANTS.MAX_MESSAGE_GROUP_LENGTH;
     }
 
+    /**
+      * Push an element into the stack
+      * @param {*} element any javascript variable
+      **/
     Delayer.prototype.push = function(element) {
       this.stack.push(element);
 
@@ -260,11 +311,17 @@ angular.module('yjs', ['op.live-conference'])
       }
     };
 
+    /**
+      * Empty the stack and unbind the callback function
+      **/
     Delayer.prototype.destroy = function() {
       this.stack = [];
       this.callback = null;
     };
 
+    /**
+      * Force the callback to be called synchronously
+      **/
     Delayer.prototype.flush = function() {
       if (this.callback) {
         this.callback(this.stack);
@@ -276,14 +333,13 @@ angular.module('yjs', ['op.live-conference'])
 
     return Delayer;
   }])
-  .service('yjsService', ['easyRTCService', 'YjsConnectorFactory', '$log', function(easyRTCService, YjsConnectorFactory, $log) {
+  .service('yjsService', ['$window', 'easyRTCService', 'YjsConnectorFactory', '$log', function($window, easyRTCService, YjsConnectorFactory, $log) {
     var connector = new YjsConnectorFactory(easyRTCService);
-    var y = new window.Y(connector);
-    $log.info('Created yjs instance', y, connector);
-    return function() {
-      return {
-        y: y,
-        connector: connector
-      };
+    var y = new $window.Y(connector);
+    var ret = {
+      connector: connector,
+      y: y
     };
+    $log.info('Created yjs instance', y, connector);
+    return ret;
   }]);

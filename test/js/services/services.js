@@ -55,10 +55,10 @@ describe('delayedStack', function() {
 
   describe('yjsService', function() {
     it('should return an object', function() {
-      expect(yjsService())
+      expect(yjsService)
       .to.be.an('object')
       .to.have.property('y');
-      expect(yjsService())
+      expect(yjsService)
       .to.have.property('connector');
     });
   });
@@ -67,7 +67,7 @@ describe('delayedStack', function() {
     var connector;
 
     beforeEach(function() {
-      connector = yjsService().connector;
+      connector = yjsService.connector;
       compressMessages.encode = function(message) {
         return {
           data: message,
