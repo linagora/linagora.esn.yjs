@@ -68,13 +68,15 @@ angular.module('yjs', ['op.live-conference'])
         }
       });
 
-      /** Expect msgData to be a compressed message with data and a map that
-        * gives compression information. See @compressMessages methods
+      /**
+        * Expect msgData to be a compressed message with data and a map that
+        * gives compression information. See compressMessages methods
+        * Example
         * {
         *   data: [],
         *   map: {},
         * }
-        */
+        **/
       easyrtc.setPeerListener(function(id, msgType, msgData) {
         var data, map;
         if (connector.is_initialized) {
@@ -179,12 +181,13 @@ angular.module('yjs', ['op.live-conference'])
       lastIndex: 0
     };
 
-    /** Generic function that converts any javascript object using the map and extraMap.
-      * @parma {*} data any javascript type
+    /**
+      * Generic function that converts any javascript object using the map and extraMap.
+      * @param {*} data any javascript type
       * @param {Object} map an associative map between keys
-      * @param {=Object} extraMap an extra optional associative map between keys
+      * @param {Object=} extraMap an extra optional associative map between keys
           it is used to encode frequently used strings
-      ** @return {*} returns an encoded/decoded variable of the same type as
+      ** @return {*} returns an encoded/decoded variable of the same type as the input
       **/
     function coder(data, map, extraMap) {
       var val;
