@@ -6,11 +6,11 @@ var expect = chai.expect;
 describe('delayedStack', function() {
   var YjsConnectorFactory, DelayedStack, compressMessages, yjsService, connectionCallback, $timeout, YJS_CONSTANTS, COMPRESS_MAP;
   var dataChannelOpenListener, dataChannelCloseListener, peerListener;
-  var easyRtcServiceMock;
+  var webRtcServiceMock;
   beforeEach(angular.mock.module('yjs'));
 
   beforeEach(angular.mock.module(function($provide) {
-      easyRtcServiceMock = {
+      webRtcServiceMock = {
       connection: function() {
         return {
           then: function(cb) {
@@ -40,7 +40,7 @@ describe('delayedStack', function() {
 
       }
     };
-    $provide.value('easyRTCService', easyRtcServiceMock);
+    $provide.value('webRTCService', webRtcServiceMock);
   }));
 
   beforeEach(angular.mock.inject(function(_YjsConnectorFactory_, _DelayedStack_, _compressMessages_, _yjsService_, _$timeout_, _YJS_CONSTANTS_, _COMPRESS_MAP_) {
@@ -80,7 +80,7 @@ describe('delayedStack', function() {
     });
 
     it('should delay the initialization until bound to Y', function() {
-      var connector = new YjsConnectorFactory(easyRtcServiceMock);
+      var connector = new YjsConnectorFactory(webRtcServiceMock);
       connector.init = chai.spy();
       connectionCallback();
       expect(connector.init).to.have.been.called.once;
@@ -149,7 +149,7 @@ describe('delayedStack', function() {
         // we flush, because yjs sends extra information
         connector.peersStack.foo.flush();
 
-        easyRtcServiceMock.sendData = function(id, name, data) {
+        webRtcServiceMock.sendData = function(id, name, data) {
           expect(id).to.equal('foo');
           expect(name).to.equal('yjs');
           expect(data).to.have.property('data')
@@ -173,7 +173,7 @@ describe('delayedStack', function() {
         // we flush, because yjs sends extra information
         connector.broadcastStack.flush();
 
-        easyRtcServiceMock.broadcastData = function(name, data) {
+        webRtcServiceMock.broadcastData = function(name, data) {
           expect(name).to.equal('yjs');
           expect(data).to.have.property('data')
             .and.be.an('array');

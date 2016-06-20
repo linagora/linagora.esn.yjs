@@ -8,11 +8,11 @@ angular.module('yjs', ['op.live-conference'])
   .factory('YjsConnectorFactory', ['$log', 'DelayedStack', 'compressMessages', function($log, DelayedStack, compressMessages) {
     /**
       * A connector for EasyRTC
-      * @param {object} easyrtc an easyrtc object
+      * @param {object} webrtc an webrtc object
       **/
-    function EasyRTCConnector(easyrtc) {
+    function WebRTCConnector(webrtc) {
       var connector = this;
-      connector.webrtc = easyrtc;
+      connector.webrtc = webrtc;
       this.connected_peers = [];
       this.peersStack = {};
 
@@ -45,13 +45,13 @@ angular.module('yjs', ['op.live-conference'])
         connector.init({
           role: 'slave',
           syncMethod: 'syncAll',
-          user_id: easyrtc.myEasyrtcid()
+          user_id: webrtc.myEasyrtcid()
         });
-        connector.connected_peers = easyrtc.getOpenedDataChannels();
+        connector.connected_peers = webrtc.getOpenedDataChannels();
         add_missing_peers();
       };
 
-      easyrtc.connection().then(function() {
+      webrtc.connection().then(function() {
         if (connector.is_bound_to_y) {
           when_bound_to_y();
         } else {
@@ -61,7 +61,7 @@ angular.module('yjs', ['op.live-conference'])
         $log.error('Error while getting connection to server.', errorCode, message);
       });
 
-      easyrtc.addDataChannelOpenListener(function(peerId) {
+      webrtc.addDataChannelOpenListener(function(peerId) {
         if (connector.is_initialized) {
           connector.connected_peers.push(peerId);
           add_missing_peers();
@@ -77,7 +77,7 @@ angular.module('yjs', ['op.live-conference'])
         *   map: {},
         * }
         **/
-      easyrtc.setPeerListener(function(id, msgType, msgData) {
+      webrtc.setPeerListener(function(id, msgType, msgData) {
         var data, map;
         if (connector.is_initialized) {
           data = msgData.data;
@@ -90,7 +90,7 @@ angular.module('yjs', ['op.live-conference'])
 
 
       /** Notify of user deconnection and delete the peer stack of the user **/
-      easyrtc.addDataChannelCloseListener(function(peerId) {
+      webrtc.addDataChannelCloseListener(function(peerId) {
         var index = connector.connected_peers.indexOf(peerId);
         if (index > -1) {
           connector.connected_peers.splice(index, 1);
@@ -121,18 +121,18 @@ angular.module('yjs', ['op.live-conference'])
       * @param {String} user_id the id of the receiver
       * @param {*} message a stringifiable object
       **/
-    EasyRTCConnector.prototype.send = function(user_id, message) {
+    WebRTCConnector.prototype.send = function(user_id, message) {
       this.peersStack[user_id].push(compressMessages.encode(message));
     };
 
     /** Broadcasts a message to all user
       * @param {*} message a stringifiable object
       **/
-    EasyRTCConnector.prototype.broadcast = function(message) {
+    WebRTCConnector.prototype.broadcast = function(message) {
       this.broadcastStack.push(compressMessages.encode(message));
     };
 
-    return EasyRTCConnector;
+    return WebRTCConnector;
   }])
   .constant('COMPRESS_MAP', {
     'sync_step': 'A',
@@ -336,8 +336,8 @@ angular.module('yjs', ['op.live-conference'])
 
     return Delayer;
   }])
-  .service('yjsService', ['$window', 'easyRTCService', 'YjsConnectorFactory', '$log', function($window, easyRTCService, YjsConnectorFactory, $log) {
-    var connector = new YjsConnectorFactory(easyRTCService);
+  .service('yjsService', ['$window', 'webRTCService', 'YjsConnectorFactory', '$log', function($window, webRTCService, YjsConnectorFactory, $log) {
+    var connector = new YjsConnectorFactory(webRTCService);
     var y = new $window.Y(connector);
     var ret = {
       connector: connector,
