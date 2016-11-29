@@ -59,7 +59,7 @@
     "usemin-patterns": "0.1.4"
   },
   "scripts": {
-    "postinstall": "./node_modules/bower/bin/bower install"
+    "postinstall": "bower install --allow-root"
   },
   "repository": {
     "type": "git"
