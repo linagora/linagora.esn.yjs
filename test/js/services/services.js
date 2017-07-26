@@ -18,7 +18,7 @@ describe('delayedStack', function() {
           }
         };
       },
-      myEasyrtcid: function() {
+      myRtcid: function() {
         return 'sqmlkqjsfdqsdf';
       },
       addDataChannelOpenListener: function(cb) {

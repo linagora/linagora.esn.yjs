@@ -7,7 +7,7 @@ angular.module('yjs', ['op.live-conference'])
   })
   .factory('YjsConnectorFactory', ['$log', 'DelayedStack', 'compressMessages', function($log, DelayedStack, compressMessages) {
     /**
-      * A connector for EasyRTC
+      * A connector for WebRTC
       * @param {object} webrtc an webrtc object
       **/
     function WebRTCConnector(webrtc) {
@@ -45,7 +45,7 @@ angular.module('yjs', ['op.live-conference'])
         connector.init({
           role: 'slave',
           syncMethod: 'syncAll',
-          user_id: webrtc.myEasyrtcid()
+          user_id: webrtc.myRtcid()
         });
         connector.connected_peers = webrtc.getOpenedDataChannels();
         add_missing_peers();
