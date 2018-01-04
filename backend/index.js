@@ -6,7 +6,7 @@ var Dependency = AwesomeModule.AwesomeModuleDependency;
 var AwesomeYjsModule = new AwesomeModule('linagora.esn.yjs', {
   dependencies: [
     new Dependency(Dependency.TYPE_NAME, 'webserver.wrapper', 'webserver-wrapper'),
-    new Dependency(Dependency.TYPE_NAME, 'linagora.io.webrtc', 'webrtc')
+    new Dependency(Dependency.TYPE_NAME, 'linagora.esn.webrtc', 'webrtc')
   ],
   states: {
     lib: function(dependencies, callback) {
