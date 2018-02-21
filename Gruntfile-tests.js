@@ -31,7 +31,7 @@ module.exports = function(grunt) {
   grunt.registerTask('test-frontend', 'run the FrontEnd tests', function() {
     var done = this.async();
 
-    var child = require('child_process').spawn('karma', ['start', '--browsers', 'PhantomJS', './test/conf/karma.conf.js']);
+    var child = require('child_process').spawn('./node_modules/karma/bin/karma', ['start', '--browsers', 'PhantomJS', './test/conf/karma.conf.js']);
 
     child.stdout.on('data', function(chunk) { grunt.log.write(chunk); });
     child.stderr.on('data', function(chunk) { grunt.log.error(chunk); });
@@ -41,7 +41,7 @@ module.exports = function(grunt) {
   grunt.registerTask('test-frontend-all', 'run the FrontEnd tests on all possible browsers', function() {
     var done = this.async();
 
-    var child = require('child_process').spawn('karma', ['start', '--browsers', 'PhantomJS,Firefox,Chrome', './test/conf/karma.conf.js']);
+    var child = require('child_process').spawn('./node_modules/karma/bin/karma', ['start', '--browsers', 'PhantomJS,Firefox,Chrome', './test/conf/karma.conf.js']);
 
     child.stdout.on('data', function(chunk) { grunt.log.write(chunk); });
     child.stderr.on('data', function(chunk) { grunt.log.error(chunk); });
