@@ -19,7 +19,11 @@ describe('delayedStack', function() {
         };
       },
       myRtcid: function() {
-        return 'sqmlkqjsfdqsdf';
+        return {
+          then: function(cb) {
+            return cb('sqmlkqjsfdqsdf');
+          }
+        };
       },
       addDataChannelOpenListener: function(cb) {
         dataChannelOpenListener = cb;

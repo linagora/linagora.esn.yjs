@@ -42,13 +42,17 @@ angular.module('yjs', ['op.live-conference'])
         * a.k.a when Y(connector) will have been called.
         **/
       var when_bound_to_y = function() {
-        connector.init({
-          role: 'slave',
-          syncMethod: 'syncAll',
-          user_id: webrtc.myRtcid()
+        webrtc.myRtcid().then(function(rtcId) {
+          connector.init({
+            role: 'slave',
+            syncMethod: 'syncAll',
+            user_id: rtcId
+          });
+          connector.connected_peers = webrtc.getOpenedDataChannels();
+          add_missing_peers();
+        }, function(err) {
+          $log.error('Error while getting the rtc Id.', err);
         });
-        connector.connected_peers = webrtc.getOpenedDataChannels();
-        add_missing_peers();
       };
 
       webrtc.connection().then(function() {
